@@ -1,0 +1,169 @@
+//SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
+
+import "@appliedzkp/semaphore-contracts/interfaces/IVerifier.sol";
+import "@appliedzkp/semaphore-contracts/base/SemaphoreCore.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./BinaryTreeLight.sol";
+
+/// @title Voter contract.
+/// @dev The following code is just a example to show how Semaphore con be used.
+contract Voter is SemaphoreCore, Ownable {
+    using BinaryTreeLight for TreeData;
+
+    event NewThanks(bytes32 thanks);    
+        
+    mapping(bytes32 => uint256) rating;
+    bytes32[] private users;
+    bytes32 private winner;
+    // address[] public governors; 
+
+    // temporary limit variable
+    uint256 private limit = 10;
+
+    /// @dev Gets a group id and returns the group/tree data.
+    mapping(uint256 => TreeData) internal groups;
+    uint256 public root;
+    mapping(uint256 => bool) internal identityCommitments;
+    uint256[] identityCommitmentsArr;
+    // The external verifier used to verify Semaphore proofs.
+    IVerifier public verifier;
+
+    constructor(bytes32[] memory _users, address _verifier) {
+        verifier = IVerifier(_verifier);
+        users = _users;
+        for (uint256 i; i < users.length; i++){
+            rating[users[i]] = 0;
+        }
+        groups[0].init(0);
+        root = getRoot(0);
+    }
+
+    function _saveIdentityCommitment(uint256 _identityCommitment) internal {
+        require(!identityCommitments[_identityCommitment], "Already added");
+        identityCommitments[_identityCommitment] = true;
+        identityCommitmentsArr.push(_identityCommitment);
+        groups[0].insert(_identityCommitment);
+        root = getRoot(0);
+        _addMember(0, _identityCommitment);
+    }
+
+    function getRatingByUser(bytes32 _user) public view returns(uint256){
+        return rating[_user];
+    }
+
+    function getRatingbyId(uint256 _i) public view returns(uint256){
+        return rating[users[_i]];
+    }
+
+    function getUsersArr() public view returns(bytes32[] memory){
+        return users;
+    }
+
+    function getUsersArrLength() public view returns(uint256){
+        return users.length;
+    }
+
+    function getRatingAllExpensive() public view returns(bytes32[] memory, uint256[] memory){
+        uint256 count = getUsersArrLength();
+        bytes32[] memory arr1 = new bytes32[](count);
+        uint256[] memory arr2 = new uint256[](count);
+        for (uint256 i; i<users.length; i++){
+            arr1[i] = users[i];
+            arr2[i] = rating[users[i]];
+        }
+        return (arr1, arr2);
+    }
+
+    function setUserRating(bytes32 _user) internal {
+        require(winner == 0x0000000000000000000000000000000000000000000000000000000000000000, "voting has ended.");
+        rating[_user] += 1; 
+        if (rating[_user] == limit){
+            setWinner(_user);
+        }
+    }
+
+    function getWinner() public view returns(bytes32, uint256){
+        uint256 _rating = getRatingByUser(winner);
+        return (winner, _rating);
+    }
+
+    function setWinner(bytes32 _user) internal {
+        winner = _user;
+    }
+
+    /// @dev Adds an identity commitment to an existing group.
+    /// @param groupId: Id of the group.
+    /// @param identityCommitment: New identity commitment.
+    function _addMember(uint256 groupId, uint256 identityCommitment) internal virtual {
+        // require(getDepth(groupId) != 0, "SemaphoreGroups: group does not exist");
+        groups[groupId].insert(identityCommitment);
+        root = getRoot(groupId);
+        // emit MemberAdded(groupId, identityCommitment, root);
+    }
+
+    function getIdentityCommitmentsArr() public view returns (uint256[] memory) {
+        return identityCommitmentsArr;
+    }
+
+    /// @dev See {ISemaphoreGroups-getRoot}.
+    function getRoot(uint256 groupId) public view virtual returns (uint256) {
+        return groups[groupId].root;
+    }
+
+    /// @dev See {ISemaphoreGroups-getRoot}.
+    function getZero() public view virtual returns (uint256) {
+        return groups[0].zeroes[0];
+    }
+
+    function lightVote(
+        bytes32 _thanks,
+        uint256 _nullifierHash,
+        uint256 _identityCommitment,
+        bytes32 _user
+    ) external {
+        require(!identityCommitments[_identityCommitment], "You cannot vote twice");
+        uint256 _root = getRoot(0);
+        require(root == _root, "Root does not match");
+        // _verifyProof(
+        //     _thanks, // bytes32 signal,
+        //     _root, // uint256 root,
+        //     _nullifierHash, // uint256 nullifierHash,
+        //     _root, // uint256 externalNullifier,
+        //     _proof, // uint256[8] calldata proof,
+        //     verifier // IVerifier verifier
+        //     );
+
+        _saveIdentityCommitment(_identityCommitment);
+        setUserRating(_user);
+        // Prevent double-voting (nullifierHash = hash(root + identityNullifier)).
+        // Every user can vote once.
+        _saveNullifierHash(_nullifierHash);
+
+        emit NewThanks(_thanks);
+    }
+
+
+
+    function vote(
+        bytes32 _thanks,
+        uint256 _root,
+        uint256 _nullifierHash,
+        uint256[8] calldata _proof,
+        bytes32 _user
+    ) external {
+        
+        _verifyProof(
+            _thanks, // bytes32 signal,
+            _root, // uint256 root,
+            _nullifierHash, // uint256 nullifierHash,
+            _root, // uint256 externalNullifier,
+            _proof, // uint256[8] calldata proof,
+            verifier // IVerifier verifier
+            );
+
+        _saveNullifierHash(_nullifierHash);
+        setUserRating(_user);
+        emit NewThanks(_thanks);
+    }
+}

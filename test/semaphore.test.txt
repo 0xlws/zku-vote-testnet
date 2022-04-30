@@ -1,0 +1,148 @@
+import { Strategy, ZkIdentity } from "@zk-kit/identity"
+// import fs from "fs"
+import path from "path"
+import { Semaphore } from "@zk-kit/protocols"
+import { 
+  generateMerkleProof, 
+  // genExternalNullifier 
+} from "@zk-kit/protocols"
+import { expect } from "chai"
+import { Contract, Signer } from "ethers"
+import { ethers, run } from "hardhat"
+import { getCurveFromName } from "ffjavascript"
+
+// import { IncrementalMerkleTree } from "@zk-kit/incremental-merkle-tree"
+// import { poseidon } from "circomlibjs"
+
+
+
+describe.skip("Semaphore", () => {
+  let curve: any
+  let contract: Contract
+  let contractOwner: Signer
+  const zkeyFiles = "./public"
+  const wasmFilePath = path.join(zkeyFiles, "semaphore.wasm")
+  const finalZkeyPath = path.join(zkeyFiles, "semaphore_final.zkey")
+
+  before(async () => {
+    contract = await run("deploy", { logs: false })
+
+    const signers = await ethers.getSigners()
+    contractOwner = signers[0]
+})
+  beforeEach(async () => {
+    curve = await getCurveFromName("bn128")
+  })
+
+  afterEach(async () => {
+    await curve.terminate()
+  })
+
+  describe("# generate and verify proof", () => {
+    // it("Should generate a Semaphore witness", async () => {
+    //   const identity = new ZkIdentity()
+    //   const identityCommitment = identity.genIdentityCommitment()
+    //   const externalNullifier = genExternalNullifier("voting_1")
+    //   const leaves = [BigInt(3), BigInt(2), identityCommitment, BigInt(4)]
+    //   const signal = "0x111"
+
+    //   const merkleProof = generateMerkleProof(20, BigInt(0), leaves, identityCommitment)
+
+    //   const witness = Semaphore.genWitness(
+    //     identity.getTrapdoor(),
+    //     identity.getNullifier(),
+    //     merkleProof,
+    //     externalNullifier,
+    //     signal
+    //   )
+
+    //   expect(typeof witness).to.equal("object")
+    // })
+
+    // eslint-disable-next-line jest/no-disabled-tests
+    it("Should generate and verify Semaphore proof", async () => {
+      const message = await contractOwner.signMessage("Sign this message to create your identity!")
+      const identity = new ZkIdentity(Strategy.MESSAGE, message)
+      const identityCommitment = identity.genIdentityCommitment()
+      const signal = "Thanks for voting!"
+      const bytes32Signal = ethers.utils.formatBytes32String(signal)
+      // const leaves = contract.getLeaves([identityCommitment])
+      const leaves = [identityCommitment]
+      // console.log("leaves is", leaves)
+      // const tree = new IncrementalMerkleTree(poseidon, 20, BigInt(0), 2)
+      // for (const leaf of leaves) {
+      //     tree.insert(leaf)
+      // }
+      // console.log("root is", tree.root)
+
+      // const leaves = [BigInt(3), BigInt(2), identityCommitment, BigInt(4)]
+      const merkleProof = generateMerkleProof(20, BigInt(0), leaves, identityCommitment)
+      // const externalNullifier = genExternalNullifier("voting_1")
+      const externalNullifier = merkleProof.root
+      // console.log("externalNullifier is", externalNullifier)
+      const witness = Semaphore.genWitness(
+        identity.getTrapdoor(),
+        identity.getNullifier(),
+        merkleProof,
+        externalNullifier,
+        signal
+      )
+
+      const fullProof = await Semaphore.genProof(witness, wasmFilePath, finalZkeyPath)
+      // const vkeyPath = path.join(zkeyFiles, "verification_key.json")
+      // const vKey = JSON.parse(fs.readFileSync(vkeyPath, "utf-8"))
+      const solidityProof = Semaphore.packToSolidityProof(fullProof.proof)
+      const nullifierHash = Semaphore.genNullifierHash(externalNullifier, identity.getNullifier())
+
+      // const response = await Semaphore.verifyProof(vKey, fullProof)
+
+      // expect(response).to.equal(true)
+      const transaction = contract.greet(bytes32Signal, externalNullifier, nullifierHash, solidityProof)
+      await expect(transaction).to.emit(contract, "NewThanks").withArgs(bytes32Signal)
+    }).timeout(30000)
+    
+
+    it("Should fail", async () => {
+      const message = await contractOwner.signMessage("Sign this message to create your identity!")
+      const identity = new ZkIdentity(Strategy.MESSAGE, message)
+      const identityCommitment = identity.genIdentityCommitment()
+      const signal = "Thanks for voting!"
+      const bytes32Signal = ethers.utils.formatBytes32String(signal)
+      // const leaves = contract.getLeaves([identityCommitment])
+      const leaves = [identityCommitment]
+      // console.log("leaves is", leaves)
+      // const tree = new IncrementalMerkleTree(poseidon, 20, BigInt(0), 2)
+      // for (const leaf of leaves) {
+      //     tree.insert(leaf)
+      // }
+      // console.log("root is", tree.root)
+
+      // const leaves = [BigInt(3), BigInt(2), identityCommitment, BigInt(4)]
+      const merkleProof = generateMerkleProof(20, BigInt(0), leaves, identityCommitment)
+      // const externalNullifier = genExternalNullifier("voting_1")
+      const externalNullifier = merkleProof.root
+      // console.log("externalNullifier is", externalNullifier)
+      const witness = Semaphore.genWitness(
+        identity.getTrapdoor(),
+        identity.getNullifier(),
+        merkleProof,
+        externalNullifier,
+        signal
+      )
+
+      const fullProof = await Semaphore.genProof(witness, wasmFilePath, finalZkeyPath)
+      // const vkeyPath = path.join(zkeyFiles, "verification_key.json")
+      // const vKey = JSON.parse(fs.readFileSync(vkeyPath, "utf-8"))
+      const solidityProof = Semaphore.packToSolidityProof(fullProof.proof)
+      const nullifierHash = Semaphore.genNullifierHash(externalNullifier, identity.getNullifier())
+
+      // const response = await Semaphore.verifyProof(vKey, fullProof)
+
+      // expect(response).to.equal(true)
+      const transaction = contract.greet(bytes32Signal, externalNullifier, nullifierHash, solidityProof)
+      await expect(transaction).to.be.reverted;
+    }).timeout(30000)
+    
+  })
+})
+

@@ -1,10 +1,10 @@
 .container {
-    padding: 0 2rem;
+    padding: 0 0rem;
 }
 
 .main {
     min-height: 100vh;
-    padding: 4rem 0;
+    padding: 4rem 2rem;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -12,20 +12,94 @@
     align-items: center;
 }
 
+.maindivdark{
+    z-index: 0;
+    position: relative;
+    max-height: 75vh;
+    box-shadow: 0 0 100px rgba(0, 0, 0, 0.5);
+}
+
+.maindivlight{
+    z-index: 0;
+    position: relative;
+    max-height: 75vh;
+    box-shadow: 0 0 100px rgba(0, 0, 0, 0.5);
+}
+
+.fade {
+    pointer-events: none;
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    box-shadow: 0 0 2px black;
+    border-radius: 5px;
+    background: linear-gradient(to top, rgba(8, 17, 143, 1), rgba(8, 17, 143, 0) 10%, rgba(8, 17, 143, 0) 90%, rgba(8, 17, 143, 1) 100%);
+}
+
+.startdiv {
+    min-height: 100vh;
+    padding: 4rem 2rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.banner {
+    background-color: #08128F;
+    display:block;
+    z-index: 999;
+    position: fixed; 
+	width: 100%; 
+    height: 45px; 
+    object-fit: cover; 
+    overflow: hidden;
+    border-bottom: 1px solid  #FFD700;
+}
+
+.logodiv {
+    position: fixed;
+    right: 46%;
+}
+
+.bannertext1 {
+    position: relative;
+    top: -60px;
+    left:50px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.logo {
+    position: relative;
+    top: 4px;
+    margin-left:auto;
+    margin-right:auto;
+    padding-right: 75px;
+
+}
+
 .logs {
-    color: #A3E5BA;
+    /* color: #A3E5BA; */
+    color: #FFD700;
     font-weight: bold;
     margin-top: 0;
     line-height: 1.5;
     font-size: 1.2rem;
     height: 70px;
+    z-index: 1;
+}
+
+.divnames {
+    text-align: center;
 }
 
 .button {
-    padding: 10px 16px;
-    border: 1px solid white;
+    padding: 8px 16px;
+    box-shadow: 0 0 2px white;
+    background-color: #0057B8;
     border-radius: 5px;
-    width: 200px;
     text-align: center;
     cursor: pointer;
 }

@@ -1,0 +1,255 @@
+import { Strategy, ZkIdentity } from "@zk-kit/identity"
+import path from "path"
+import { Semaphore } from "@zk-kit/protocols"
+import { 
+  generateMerkleProof, 
+} from "@zk-kit/protocols"
+import { expect } from "chai"
+import { Contract, Signer } from "ethers"
+import { ethers, run } from "hardhat"
+import { getCurveFromName } from "ffjavascript"
+// import { IncrementalMerkleTree } from "@zk-kit/incremental-merkle-tree"
+// import { poseidon } from "circomlibjs"
+
+
+// test
+describe("SemaphoreLight", () => {
+  let curve: any
+  let contract: Contract
+  let contractOwner: Signer
+  let address1: Signer
+  let address2: Signer
+
+  const zkeyFiles = "./public"
+  const wasmFilePath = path.join(zkeyFiles, "semaphore.wasm")
+  const finalZkeyPath = path.join(zkeyFiles, "semaphore_final.zkey")
+  const _users = ["0xlws", "Tomo", "Margulus", "JanR", "Kousik", "Hakwan Lau", "CathieSo", "Vivian"];
+  const users = _users.map(user => ethers.utils.formatBytes32String(user));
+
+  //deploy voting contract before tests
+  before(async () => {
+    contract = await run("deploy", { logs: false })
+
+    //get hardhat addresses
+    const signers = await ethers.getSigners()
+    //get the first hardhat address
+    contractOwner = signers[0]
+    address1 = signers[1]
+    address2 = signers[2]
+  })
+
+  beforeEach(async () => {
+    curve = await getCurveFromName("bn128")
+  })
+
+  afterEach(async () => {
+    await curve.terminate()
+  })
+
+  describe("# Generate and verify proof", () => {
+    it("Should vote, generate and verify Semaphore proof", async () => {
+      const message = await contractOwner.signMessage("Sign this message to create your identity!")
+      const identity = new ZkIdentity(Strategy.MESSAGE, message)
+      const identityCommitment = identity.genIdentityCommitment()
+      // const leaves = await contract.getIdentityCommitmentsArr()
+      // console.log("commitmentsArr is", leaves)
+      // const leaves = await contract.getIdentityCommitmentsArr()
+      // console.log("commitmentsArr is", leaves)
+      // const externalNullifier = poseidon([leaves])
+      const externalNullifier = await contract.getRoot(BigInt(0))
+      // console.log("externalNullifier is", externalNullifier)
+      const signal = "Thanks for voting!"
+      const bytes32Signal = ethers.utils.formatBytes32String(signal)
+      const nullifierHash = Semaphore.genNullifierHash(externalNullifier, identity.getNullifier())
+      const transaction = contract.lightVote(bytes32Signal, nullifierHash ,identityCommitment, users[0])
+      // console.log(typeof(externalNullifier))
+      await expect(transaction).to.emit(contract, "NewThanks").withArgs(bytes32Signal)
+    }).timeout(30000)
+
+    it("Should fail to vote", async () => {
+      const message = await contractOwner.signMessage("Sign this message to create your identity!")
+      const identity = new ZkIdentity(Strategy.MESSAGE, message)
+      const identityCommitment = identity.genIdentityCommitment()
+      // const leaves = await contract.getIdentityCommitmentsArr()
+      // console.log("commitmentsArr is", leaves)
+      // const externalNullifier: bigint = poseidon([leaves])
+      const externalNullifier = await contract.getRoot(BigInt(0))
+      // console.log("externalNullifier is", externalNullifier)
+      // console.log("externalNullifier is", externalNullifier)
+      // console.log("externalNullifier is BI", BigInt(externalNullifier))
+
+      const signal = "Thanks for voting!"
+      const bytes32Signal = ethers.utils.formatBytes32String(signal)
+      const nullifierHash = Semaphore.genNullifierHash(externalNullifier, identity.getNullifier())
+      const transaction = contract.lightVote(bytes32Signal, nullifierHash, identityCommitment, users[1])
+      // console.log(typeof(externalNullifier))
+      await expect(transaction).to.be.reverted
+    }).timeout(30000)
+
+    //prevent double spend test
+    it("Should fail to vote", async () => {
+      const message = await contractOwner.signMessage("Sign this message to create your identity!")
+      const identity = new ZkIdentity(Strategy.MESSAGE, message)
+      const identityCommitment = identity.genIdentityCommitment()
+      // const zero = await contract.getZero()
+      // console.log("zero is", BigInt(zero))
+      // const leaves = await contract.getIdentityCommitmentsArr()
+      // console.log("commitmentsArr is", leaves)
+      // const leaves = await contract.getIdentityCommitmentsArr()
+      // console.log("commitmentsArr is", leaves)
+      // const externalNullifier = poseidon([leaves])
+      const externalNullifier = await contract.getRoot(BigInt(0))
+      // console.log("externalNullifier is", externalNullifier)
+      const signal = "Thanks for voting!"
+      const bytes32Signal = ethers.utils.formatBytes32String(signal)
+      const nullifierHash = Semaphore.genNullifierHash(externalNullifier, identity.getNullifier())
+      const transaction = contract.lightVote(bytes32Signal, nullifierHash, identityCommitment, users[2])
+      // console.log(typeof(externalNullifier))
+      await expect(transaction).to.be.reverted
+    }).timeout(30000)
+
+    it("Should vote, generate and verify  proof", async () =>{
+      const message = await address1.signMessage("Sign this message to create your identity!")
+      const identity = new ZkIdentity(Strategy.MESSAGE, message)
+      const identityCommitment = identity.genIdentityCommitment()
+      // const leaves = await contract.getIdentityCommitmentsArr()
+      // console.log("commitmentsArr is", leaves)
+      // const leaves = await contract.getIdentityCommitmentsArr()
+      // console.log("commitmentsArr is", leaves)
+      // console.log("1")
+      // const externalNullifier = poseidon([leaves])
+      const externalNullifier = await contract.getRoot(BigInt(0))
+      // console.log("externalNullifier is", externalNullifier)
+      const signal = "Thanks for voting!"
+      const bytes32Signal = ethers.utils.formatBytes32String(signal)
+      const nullifierHash = Semaphore.genNullifierHash(externalNullifier, identity.getNullifier())
+      const transaction = contract.lightVote(bytes32Signal, nullifierHash, identityCommitment, users[3])
+      // console.log(typeof(externalNullifier))
+      await expect(transaction).to.emit(contract, "NewThanks").withArgs(bytes32Signal)
+    }).timeout(30000)
+    
+    it("Should vote, generate and verify = proof", async () => {
+      const message = await address2.signMessage("Sign this message to create your identity!")
+      const identity = new ZkIdentity(Strategy.MESSAGE, message)
+      const identityCommitment = identity.genIdentityCommitment()
+      // const leaves = await contract.getIdentityCommitmentsArr()
+      // console.log("commitmentsArr is", leaves)
+      // const leaves = await contract.getIdentityCommitmentsArr()
+      // console.log("commitmentsArr is", leaves)
+      // console.log("2")
+      // const externalNullifier = poseidon([leaves])
+      const externalNullifier = await contract.getRoot(BigInt(0))
+      // console.log("externalNullifier is", externalNullifier)
+      // console.log("3")
+      const signal = "Thanks for voting!"
+      const bytes32Signal = ethers.utils.formatBytes32String(signal)
+      const nullifierHash = Semaphore.genNullifierHash(externalNullifier, identity.getNullifier())
+      const transaction = contract.lightVote(bytes32Signal, nullifierHash, identityCommitment, users[4])
+      // console.log(typeof(externalNullifier))
+      await expect(transaction).to.emit(contract, "NewThanks").withArgs(bytes32Signal)
+    }).timeout(30000)
+
+    it("Should vote multiple times, generate and verify Semaphore proof", async () => {
+      const message = await contractOwner.signMessage("Sign this message to create your identity!")
+      const message1 = await address1.signMessage("Sign this message to create your identity!")
+      const message2 = await address2.signMessage("Sign this message to create your identity!")
+      const identity = new ZkIdentity(Strategy.MESSAGE, message)
+      const identity1 = new ZkIdentity(Strategy.MESSAGE, message1)
+      const identity2 = new ZkIdentity(Strategy.MESSAGE, message2)
+      const identityCommitment = identity.genIdentityCommitment()
+      const identityCommitment1 = identity1.genIdentityCommitment()
+      const identityCommitment2 = identity2.genIdentityCommitment()
+      const leaves1 = [identityCommitment, identityCommitment1]
+      const leaves2 = [identityCommitment, identityCommitment1, identityCommitment2]
+      const merkleProof1 = generateMerkleProof(20, BigInt(0), leaves1, identityCommitment1)
+      const merkleProof2 = generateMerkleProof(20, BigInt(0), leaves2, identityCommitment2)
+      const externalNullifier1 = merkleProof1.root
+      const externalNullifier2 = merkleProof2.root
+      const signal = "Thanks for voting!"
+      const bytes32Signal = ethers.utils.formatBytes32String(signal)
+      const witness1 = Semaphore.genWitness(
+        identity1.getTrapdoor(),
+        identity1.getNullifier(),
+        merkleProof1,
+        externalNullifier1,
+        signal
+      )
+      const witness2 = Semaphore.genWitness(
+        identity2.getTrapdoor(),
+        identity2.getNullifier(),
+        merkleProof2,
+        externalNullifier2,
+        signal
+      )
+      const fullProof1 = await Semaphore.genProof(witness1, wasmFilePath, finalZkeyPath)
+      const fullProof2 = await Semaphore.genProof(witness2, wasmFilePath, finalZkeyPath)
+      const solidityProof1 = Semaphore.packToSolidityProof(fullProof1.proof)
+      const solidityProof2 = Semaphore.packToSolidityProof(fullProof2.proof)
+      const nullifierHash1 = Semaphore.genNullifierHash(externalNullifier1, identity1.getNullifier())
+      const nullifierHash2 = Semaphore.genNullifierHash(externalNullifier2, identity2.getNullifier())
+      const transaction1 = contract.vote(bytes32Signal, externalNullifier1, nullifierHash1, solidityProof1, users[5])
+      await expect(transaction1).to.emit(contract, "NewThanks").withArgs(bytes32Signal)
+      const transaction2 = contract.vote(bytes32Signal, externalNullifier2, nullifierHash2, solidityProof2, users[6])
+      await expect(transaction2).to.emit(contract, "NewThanks").withArgs(bytes32Signal)
+    }).timeout(30000)
+
+    it("Should fail address1", async () => {
+      const message = await contractOwner.signMessage("Sign this message to create your identity!")
+      const message1 = await address1.signMessage("Sign this message to create your identity!")
+      const message2 = await address2.signMessage("Sign this message to create your identity!")
+      const identity = new ZkIdentity(Strategy.MESSAGE, message)
+      const identity1 = new ZkIdentity(Strategy.MESSAGE, message1)
+      const identity2 = new ZkIdentity(Strategy.MESSAGE, message2)
+      const identityCommitment = identity.genIdentityCommitment()
+      const identityCommitment1 = identity1.genIdentityCommitment()
+      const identityCommitment2 = identity2.genIdentityCommitment()
+      const signal = "Thanks for voting!"
+      const bytes32Signal = ethers.utils.formatBytes32String(signal)
+      const leaves = [identityCommitment, identityCommitment1, identityCommitment2]
+      const merkleProof = generateMerkleProof(20, BigInt(0), leaves, identityCommitment)
+      const externalNullifier = merkleProof.root
+      const witness = Semaphore.genWitness(
+        identity.getTrapdoor(),
+        identity.getNullifier(),
+        merkleProof,
+        externalNullifier,
+        signal
+      )
+      const fullProof = await Semaphore.genProof(witness, wasmFilePath, finalZkeyPath)
+      const solidityProof = Semaphore.packToSolidityProof(fullProof.proof)
+      const nullifierHash = Semaphore.genNullifierHash(externalNullifier, identity1.getNullifier())
+      const transaction = contract.lightVote(bytes32Signal, externalNullifier, nullifierHash, solidityProof, identityCommitment1, users[7])
+      await expect(transaction).to.be.reverted;
+    }).timeout(30000)
+
+    it("Should fail address2", async () => {
+      const message = await contractOwner.signMessage("Sign this message to create your identity!")
+      const message1 = await address1.signMessage("Sign this message to create your identity!")
+      const message2 = await address2.signMessage("Sign this message to create your identity!")
+      const identity = new ZkIdentity(Strategy.MESSAGE, message)
+      const identity1 = new ZkIdentity(Strategy.MESSAGE, message1)
+      const identity2 = new ZkIdentity(Strategy.MESSAGE, message2)
+      const identityCommitment = identity.genIdentityCommitment()
+      const identityCommitment1 = identity1.genIdentityCommitment()
+      const identityCommitment2 = identity2.genIdentityCommitment()      
+      const signal = "Thanks for voting!"
+      const bytes32Signal = ethers.utils.formatBytes32String(signal)
+      const leaves = [identityCommitment, identityCommitment1, identityCommitment2]
+      const merkleProof = generateMerkleProof(20, BigInt(0), leaves, identityCommitment)
+      const externalNullifier = merkleProof.root
+      const witness = Semaphore.genWitness(
+        identity.getTrapdoor(),
+        identity.getNullifier(),
+        merkleProof,
+        externalNullifier,
+        signal
+      )
+      const fullProof = await Semaphore.genProof(witness, wasmFilePath, finalZkeyPath)
+      const solidityProof = Semaphore.packToSolidityProof(fullProof.proof)
+      const nullifierHash = Semaphore.genNullifierHash(externalNullifier, identity2.getNullifier())
+      const transaction = contract.lightVote(bytes32Signal, externalNullifier, nullifierHash, solidityProof, identityCommitment2)
+      await expect(transaction).to.be.reverted;
+    }).timeout(30000)
+  })
+})
+
