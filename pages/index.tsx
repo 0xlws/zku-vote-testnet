@@ -25,7 +25,8 @@ const cfg = {
   walletAddress: process.env.NEXT_PUBLIC_WALLET_ADDRESS,
 };
 
-const contractAddress = "0x1a9AddD2683E06D7DEeE92eb9Bde832cB5B6Fe03";
+const contractAddress = "0x1a9AddD2683E06D7DEeE92eb9Bde832cB5B6Fe03"; // rinkeby
+// const contractAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"; // localhost
 
 export default function Home() {
   const [logs, setLogs] = React.useState("Welcome to ZKU-vote!");
@@ -39,6 +40,7 @@ export default function Home() {
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setValue(event.target.value);
   };
+
   const handleClickOpen = (choice: any) => {
     setChoice(choice);
     setOpen(true);
@@ -56,10 +58,15 @@ export default function Home() {
   }, [success]);
 
   async function load() {
+    // rinkeby
     const provider = new providers.JsonRpcProvider(`${cfg.rinkebyUrl}`);
     const signer = provider.getSigner(`${cfg.walletAddress}`);
-    const contract = new Contract(contractAddress, VoterDemo.abi, signer);
 
+    // localhost
+    // const provider = new providers.JsonRpcProvider();
+    // const signer = provider.getSigner();
+
+    const contract = new Contract(contractAddress, VoterDemo.abi, signer);
     const onChainData = await contract.getRatingAllExpensive();
     getData(onChainData);
   }
@@ -67,19 +74,12 @@ export default function Home() {
   async function getData(onChainData: any) {
     const items = onChainData as unknown as [string[], string[] | number[]];
     if (items != undefined) {
-      let x = items[0];
-      let y = items[1];
-      y = y.map((e) => parseInt(e as string));
-      const xy = x.map((a: BytesLike, i: number) => [a, y[i]]);
-      const _names = xy.map((name: any, index: any) => {
-        return utils.parseBytes32String(name[0] as BytesLike);
-      });
-      const nestedNamesLoaded = _names.map((e: any, i: any) => [
-        e,
-        xy[i][0],
-        xy[i][1],
+      const renderData = [...Array(items[0].length)].map((_: any, i: any) => [
+        utils.parseBytes32String(items[0][i] as BytesLike),
+        items[0][i],
+        parseInt(items[1][i] as string),
       ]);
-      setData(nestedNamesLoaded);
+      setData(renderData);
       setLoaded(true);
     }
   }

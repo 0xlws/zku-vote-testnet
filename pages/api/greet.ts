@@ -25,14 +25,19 @@ export default async function handler(
   } = JSON.parse(req.body);
 
   const contract = new Contract(
-    "0x1a9AddD2683E06D7DEeE92eb9Bde832cB5B6Fe03",
+    "0x1a9AddD2683E06D7DEeE92eb9Bde832cB5B6Fe03", // rinkeby
+    // "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512", // localhost
     VoterDemo.abi
   );
 
+  // rinkeby
   const provider = new providers.JsonRpcProvider(`${cfg.rinkebyUrl}`);
-
   const signer = new Wallet(`${cfg.pKey}`, provider);
   const contractOwner = contract.connect(signer);
+
+  // localhost
+  // const provider = new providers.JsonRpcProvider("http://localhost:8545");
+  // const contractOwner = contract.connect(provider.getSigner());
 
   try {
     await contractOwner.vote(
