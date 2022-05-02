@@ -76,7 +76,7 @@ export default function Home() {
     if (items != undefined) {
       const renderData = [...Array(items[0].length)].map((_: any, i: any) => [
         utils.parseBytes32String(items[0][i] as BytesLike),
-        items[0][i],
+        items[0][i] as BytesLike,
         parseInt(items[1][i] as string),
       ]);
       setData(renderData);
